@@ -130,8 +130,6 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._topZipcodeCategories)
         group_box.setLayout(layout)
 
-
-
         return group_box
 
     def create_middle_pane(self):
@@ -150,7 +148,7 @@ class MainWindow(QMainWindow):
         self._businessSelection.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
         list1.setFixedSize(200, 140)
-        self._businessSelection.setFixedSize(490, 140)
+        self._businessSelection.setFixedSize(540, 140)
         button1.setFixedSize(40, 50)
         button2.setFixedSize(40, 50)
 
@@ -167,19 +165,19 @@ class MainWindow(QMainWindow):
         return group_box
 
     def create_bottom_pane(self):
-        group_box = QGroupBox("What's Good?")
+        group_box = QGroupBox("What's Good in the selected zipcode area?")
         layout = QHBoxLayout()
 
         button = QPushButton("Button")
-        list1_label = QLabel("Popular Businesses (in zipcode):")
+        list1_label = QLabel("Popular Businesses")
         list1 = QListWidget()
 
-        list2_label = QLabel("Succesful Businesses (in zipcode):")
+        list2_label = QLabel("Succesful Businesses")
         list2 = QListWidget()
 
-        list1.setFixedSize(300, 140)
-        list2.setFixedSize(300, 140)
-        button.setFixedSize(20, 20)
+        list1.setFixedSize(380, 140)
+        list2.setFixedSize(380, 140)
+        button.setFixedSize(40, 40)
 
         layout.addWidget(button)
         layout.addWidget(list1_label)
@@ -263,14 +261,12 @@ class MainWindow(QMainWindow):
 
     def updateZipcodeStats(self):
         try:
+            print("Updating zipcode stats")
             zipItem = self._zipcodeSelection.currentItem()
             zipcode = zipItem.text() if zipItem else ''
 
             # This query will be in charge of getting the number of businesses in the selected zipcode
             businessCountQuery ='SELECT COUNT(*) FROM business WHERE postal_code=\'' + zipcode + '\''
-            # params = [zipcode]
-            # params.append(zipcode)
-
             self._cursor.execute(businessCountQuery)
             businessCount = self._cursor.fetchone()
             self._zipcodeNumBusinesses.setText(str(businessCount[0]))
@@ -283,11 +279,12 @@ class MainWindow(QMainWindow):
             self._zipcodeAverageIncome.setText(str(population[1]))
 
             # This query will be in charge of getting the top categories of the selected zipcode
-            # topCategoriesQuery = 'SELECT category, COUNT(*) FROM business WHERE zipcode=' + zipcode + ' GROUP BY category ORDER BY COUNT(*) DESC LIMIT 5'
-            # self._cursor.execute(topCategoriesQuery)
-            # topCategories = self._cursor.fetchall()
-            # self._topZipcodeCategories.clear()
-            # self._topZipcodeCategories.addItems([category[0] for category in topCategories])
+            # To note, the categories are not stored in the business table, so we will need to join the business table with the category table named "categories". It's schema is categories (business_id, category)
+            topCategoriesQuery = 'SELECT category FROM business JOIN categories ON business.business_id = categories.business_id WHERE postal_code=\'' + zipcode + '\' GROUP BY category ORDER BY COUNT(*) DESC LIMIT 7'
+            self._cursor.execute(topCategoriesQuery)
+            topCategories = self._cursor.fetchall()
+            self._topZipcodeCategories.clear()
+            self._topZipcodeCategories.addItems([category[0] for category in topCategories])
         except Exception as e:
             print("Error updating zipcode stats: ", e)
             traceback.print_exc
