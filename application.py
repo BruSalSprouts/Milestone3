@@ -16,11 +16,16 @@ class MainWindow(QMainWindow):
         self._conn = psycopg2.connect(database="milestonedb2", user="postgres", password="Bettaman65065", host="127.0.0.1", port=5432)
         self._cursor = self._conn.cursor()
 
-        # Create QWidgets that will be updated throughout the program
-        self._stateSelection = QComboBox()
-        self._citySelection = QListWidget()
-        self._zipcodeSelection = QListWidget()
-        self._businessSelection = QTableWidget()
+        # Creation of QWidgets that will be updated throughout the program
+        self._stateSelection = QComboBox() # Dropdown menu for states, also selects a state
+        self._citySelection = QListWidget() # List of cities in the selected state, also selects a city
+        self._zipcodeSelection = QListWidget() # List of zipcodes in the selected city, also selects a zipcode
+        self._businessSelection = QTableWidget() # Table of businesses in the selected zipcode
+        self._zipcodeNumBusinesses = QLineEdit() # Number of businesses in the selected zipcode
+        self._zipcodePopulation = QLineEdit() # Total population of the selected zipcode
+        self._zipcodeAverageIncome = QLineEdit() # Average income of the selected zipcode
+        self._topZipcodeCategories = QListWidget() # Top categories of businesses in the selected zipcode
+
 
         self._initUI()
 
@@ -72,6 +77,7 @@ class MainWindow(QMainWindow):
         # Updating the cities and zipcodes
         self._citySelection.itemSelectionChanged.connect(self.updateZipcodes)
         self._zipcodeSelection.itemSelectionChanged.connect(self.updateBusinesses)
+        self._zipcodeSelection.itemSelectionChanged.connect(self.updateZipcodeStats)
 
         self._stateSelection.setFixedSize(50, 25)
         self._citySelection.setFixedSize(180, 140)
@@ -98,31 +104,34 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout()
 
         text1_label = QLabel("# of Businesses")
-        text1 = QLineEdit()
+        # self._zipcodeNumBusinesses = QLineEdit()
 
         text2_label = QLabel("Total Population")
-        text2 = QLineEdit()
+        # self._zipcodePopulation = QLineEdit()
 
         text3_label = QLabel("Average Income:")
-        text3 = QLineEdit()
+        # self._zipcodeAverageIncome = QLineEdit()
 
         list_label = QLabel("Top Categories:")
-        list_widget = QListWidget()
-
-        text1.setFixedSize(150, 25)
-        text2.setFixedSize(150, 25)
-        text3.setFixedSize(150, 25)
-        list_widget.setFixedSize(470, 140)
+        # self._topZipcodeCategories = QListWidget()
+        
+        self._zipcodeNumBusinesses.setFixedSize(150, 25)
+        self._zipcodePopulation.setFixedSize(150, 25)
+        self._zipcodeAverageIncome.setFixedSize(150, 25)
+        self._topZipcodeCategories.setFixedSize(470, 140)
 
         layout.addWidget(text1_label)
-        layout.addWidget(text1)
+        layout.addWidget(self._zipcodeNumBusinesses)
         layout.addWidget(text2_label)
-        layout.addWidget(text2)
+        layout.addWidget(self._zipcodePopulation)
         layout.addWidget(text3_label)
-        layout.addWidget(text3)
+        layout.addWidget(self._zipcodeAverageIncome)
         layout.addWidget(list_label)
-        layout.addWidget(list_widget)
+        layout.addWidget(self._topZipcodeCategories)
         group_box.setLayout(layout)
+
+
+
         return group_box
 
     def create_middle_pane(self):
@@ -251,10 +260,42 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print("Error updating businesses: ", e)
             traceback.print_exc()
-    
+
+    def updateZipcodeStats(self):
+        try:
+            zipItem = self._zipcodeSelection.currentItem()
+            zipcode = zipItem.text() if zipItem else ''
+
+            # This query will be in charge of getting the number of businesses in the selected zipcode
+            businessCountQuery ='SELECT COUNT(*) FROM business WHERE postal_code=\'' + zipcode + '\''
+            # params = [zipcode]
+            # params.append(zipcode)
+
+            self._cursor.execute(businessCountQuery)
+            businessCount = self._cursor.fetchone()
+            self._zipcodeNumBusinesses.setText(str(businessCount[0]))
+
+            # This query will be in charge of getting the total population and average income of the selected zipcode
+            populationQuery = 'SELECT population, "meanIncome" FROM "zipcodeData" WHERE zipcode=\'' + zipcode + '\''
+            self._cursor.execute(populationQuery)
+            population = self._cursor.fetchone()
+            self._zipcodePopulation.setText(str(population[0]))
+            self._zipcodeAverageIncome.setText(str(population[1]))
+
+            # This query will be in charge of getting the top categories of the selected zipcode
+            # topCategoriesQuery = 'SELECT category, COUNT(*) FROM business WHERE zipcode=' + zipcode + ' GROUP BY category ORDER BY COUNT(*) DESC LIMIT 5'
+            # self._cursor.execute(topCategoriesQuery)
+            # topCategories = self._cursor.fetchall()
+            # self._topZipcodeCategories.clear()
+            # self._topZipcodeCategories.addItems([category[0] for category in topCategories])
+        except Exception as e:
+            print("Error updating zipcode stats: ", e)
+            traceback.print_exc
+
     def closeEvent(self, event):
         self._cursor.close()
         self._conn.close()
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
