@@ -26,7 +26,8 @@ class MainWindow(QMainWindow):
         self._zipcodePopulation = QLineEdit() # Total population of the selected zipcode
         self._zipcodeAverageIncome = QLineEdit() # Average income of the selected zipcode
         self._topZipcodeCategories = QListWidget() # Top categories of businesses in the selected zipcode
-
+        self._popularBusinesses = QTableWidget() # Popular businesses in the selected zipcode
+        self._successfulBusinesses = QTableWidget() # Successful businesses in the selected zipcode
 
         self._initUI()
 
@@ -80,6 +81,7 @@ class MainWindow(QMainWindow):
         self._zipcodeSelection.itemSelectionChanged.connect(self.updateBusinesses)
         self._zipcodeSelection.itemSelectionChanged.connect(self.updateZipcodeStats)
         self._zipcodeSelection.itemSelectionChanged.connect(self.updateCategoryBusinesses)
+        self._zipcodeSelection.itemSelectionChanged.connect(self.updatePopularBusinesses)
 
         self._stateSelection.setFixedSize(50, 25)
         self._citySelection.setFixedSize(180, 140)
@@ -141,12 +143,16 @@ class MainWindow(QMainWindow):
         list1_label = QLabel("Select Category")
         # self._filterCategory = QListWidget()
         self._filterCategorySelection.itemSelectionChanged.connect(self.updateBusinesses)
+        self._filterCategorySelection.itemSelectionChanged.connect(self.updatePopularBusinesses)
 
         _categoryBusinessRefreshButton = QPushButton("Refresh")
-        _categoryResetButton = QPushButton("Reset")
+        _categoryResetButton = QPushButton("Clear\nFilter")
         _categoryResetButton.clicked.connect(self._businessSelection.clear)
         _categoryResetButton.clicked.connect(self._filterCategorySelection.clear)
         _categoryResetButton.clicked.connect(self.updateBusinesses)
+        _categoryResetButton.clicked.connect(self._popularBusinesses.clear)
+        _categoryResetButton.clicked.connect(self.updatePopularBusinesses)
+        _categoryResetButton.clicked.connect(self._successfulBusinesses.clear)
 
         list2_label = QLabel("Businesses")
         # self._businessSelection = QTableWidget()
@@ -158,38 +164,38 @@ class MainWindow(QMainWindow):
         _categoryBusinessRefreshButton.setFixedSize(50, 50)
         _categoryResetButton.setFixedSize(50, 50)
 
-        vertical_layout = QVBoxLayout()
-        vertical_layout.addWidget(_categoryBusinessRefreshButton)
-        vertical_layout.addWidget(_categoryResetButton)
+        _middleButtonLayout = QVBoxLayout()
+        _middleButtonLayout.addWidget(_categoryBusinessRefreshButton)
+        _middleButtonLayout.addWidget(_categoryResetButton)
 
         layout.addWidget(list1_label)
         layout.addWidget(self._filterCategorySelection)
-        layout.addLayout(vertical_layout)
+        layout.addLayout(_middleButtonLayout)
         layout.addWidget(list2_label)
         layout.addWidget(self._businessSelection)
         group_box.setLayout(layout)
         return group_box
 
     def create_bottom_pane(self):
-        group_box = QGroupBox("What's Good in the selected zipcode area?")
+        group_box = QGroupBox("What's Good?")
         layout = QHBoxLayout()
 
         button = QPushButton("Button")
-        list1_label = QLabel("Popular Businesses")
-        list1 = QListWidget()
+        popularBizLabel = QLabel("Popular Businesses (in zipcode)")
+        # self._popularBusinesses = QListWidget()
 
-        list2_label = QLabel("Succesful Businesses")
-        list2 = QListWidget()
+        successfulBizLabel = QLabel("Succesful Businesses (in zipcode)")
+        # self._successfulBusinesses = QListWidget()
 
-        list1.setFixedSize(380, 140)
-        list2.setFixedSize(380, 140)
+        self._popularBusinesses.setFixedSize(380, 140)
+        self._successfulBusinesses.setFixedSize(380, 140)
         button.setFixedSize(40, 40)
 
         layout.addWidget(button)
-        layout.addWidget(list1_label)
-        layout.addWidget(list1)
-        layout.addWidget(list2_label)
-        layout.addWidget(list2)
+        layout.addWidget(popularBizLabel)
+        layout.addWidget(self._popularBusinesses)
+        layout.addWidget(successfulBizLabel)
+        layout.addWidget(self._successfulBusinesses)
         group_box.setLayout(layout)
         return group_box
 
@@ -347,6 +353,64 @@ class MainWindow(QMainWindow):
     def resetCategoryBusinesses(self):
         self._filterCategorySelection.clear()
         self._updateBusinesses()
+
+    def updatePopularBusinesses(self):
+        try:
+            print("Updating popular businesses")
+            state = self._stateSelection.currentText()
+            cityItem = self._citySelection.currentItem()
+            zipItem = self._zipcodeSelection.currentItem()
+            categoryItem = self._filterCategorySelection.currentItem()
+            city = cityItem.text() if cityItem else ''
+            zipCode = zipItem.text() if zipItem else ''
+            category = categoryItem.text() if categoryItem else ''
+            # We'll be getting the businesses that are doing better than the average business 
+            # in the selected zipcode and category (if selected)
+
+            if category:
+                query = 'SELECT b.name, b.address, b.review_rating as Rating, b.stars FROM Business b JOIN (SELECT city, AVG(num_checkins) AS avg_checkins FROM Business GROUP BY city) AS city_avg ON b.city = city_avg.city LEFT JOIN categories c ON b.business_id = c.business_id WHERE b.num_checkins > city_avg.avg_checkins AND b.state=%s'
+                params = [state]
+                if city:
+                    query += " AND b.city=%s"
+                    params.append(city)
+                if zipCode:
+                    query += " AND b.postal_code=%s"
+                    params.append(zipCode)
+                if category:
+                    query += " AND c.category=%s"
+                    params.append(category)
+                query += " GROUP BY b.business_id, b.city, b.name ORDER BY b.city, b.num_checkins DESC;"
+            else:
+                query = 'SELECT b.name, b.address, b.review_rating as Rating, b.stars FROM Business b JOIN (  SELECT city, AVG(num_checkins) AS avg_checkins FROM Business GROUP BY city) AS city_avg ON b.city = city_avg.city WHERE b.num_checkins > city_avg.avg_checkins AND b.state=%s'
+                params = [state]
+                if city:
+                    query += " AND b.city=%s"
+                    params.append(city)
+                if zipCode:
+                    query += " AND b.postal_code=%s"
+                    params.append(zipCode)
+                query += " GROUP BY b.business_id, b.city, b.name ORDER BY b.city, b.num_checkins DESC;"
+            
+            self._cursor.execute(query, tuple(params))
+            results = self._cursor.fetchall()
+
+            self._popularBusinesses.clear()
+            # self._popularBusinesses.addItems([business[1] for business in results])
+            self._popularBusinesses.setRowCount(len(results))
+            self._popularBusinesses.setColumnCount(4)
+            headers = ["Name", "Address", "Rating", "Stars"]
+            self._popularBusinesses.setHorizontalHeaderLabels(headers)
+            for row, tup in enumerate(results):
+                for col, value in enumerate(tup):
+                    item = QTableWidgetItem(str(value)) # Convert values to strings
+                    self._popularBusinesses.setItem(row, col, item)
+
+        except:
+            print("Error updating popular businesses")
+            traceback.print_exc()
+
+    def updateSuccessfulBusinesses(self):
+        print("Updating successful businesses")
 
     def closeEvent(self, event):
         self._cursor.close()
