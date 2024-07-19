@@ -82,6 +82,7 @@ class MainWindow(QMainWindow):
         self._zipcodeSelection.itemSelectionChanged.connect(self.updateZipcodeStats)
         self._zipcodeSelection.itemSelectionChanged.connect(self.updateCategoryBusinesses)
         self._zipcodeSelection.itemSelectionChanged.connect(self.updatePopularBusinesses)
+        self._zipcodeSelection.itemSelectionChanged.connect(self.updateSuccessfulBusinesses)
 
         self._stateSelection.setFixedSize(50, 25)
         self._citySelection.setFixedSize(180, 140)
@@ -144,6 +145,7 @@ class MainWindow(QMainWindow):
         # self._filterCategory = QListWidget()
         self._filterCategorySelection.itemSelectionChanged.connect(self.updateBusinesses)
         self._filterCategorySelection.itemSelectionChanged.connect(self.updatePopularBusinesses)
+        self._filterCategorySelection.itemSelectionChanged.connect(self.updateSuccessfulBusinesses)
 
         _categoryBusinessRefreshButton = QPushButton("Refresh")
         _categoryResetButton = QPushButton("Clear\nFilter")
@@ -153,14 +155,15 @@ class MainWindow(QMainWindow):
         _categoryResetButton.clicked.connect(self._popularBusinesses.clear)
         _categoryResetButton.clicked.connect(self.updatePopularBusinesses)
         _categoryResetButton.clicked.connect(self._successfulBusinesses.clear)
+        _categoryResetButton.clicked.connect(self.updateSuccessfulBusinesses)
 
         list2_label = QLabel("Businesses")
         # self._businessSelection = QTableWidget()
         self._businessSelection.horizontalHeader().setStretchLastSection(True) 
         self._businessSelection.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
-        self._filterCategorySelection.setFixedSize(200, 140)
-        self._businessSelection.setFixedSize(600, 140)
+        self._filterCategorySelection.setFixedSize(170, 140)
+        self._businessSelection.setFixedSize(650, 140)
         _categoryBusinessRefreshButton.setFixedSize(50, 50)
         _categoryResetButton.setFixedSize(50, 50)
 
@@ -181,10 +184,10 @@ class MainWindow(QMainWindow):
         layout = QHBoxLayout()
 
         button = QPushButton("Button")
-        popularBizLabel = QLabel("Popular Businesses (in zipcode)")
+        popularBizLabel = QLabel("Popular Businesses")
         # self._popularBusinesses = QListWidget()
 
-        successfulBizLabel = QLabel("Succesful Businesses (in zipcode)")
+        successfulBizLabel = QLabel("Succesful Businesses")
         # self._successfulBusinesses = QListWidget()
 
         self._popularBusinesses.setFixedSize(380, 140)
@@ -251,7 +254,7 @@ class MainWindow(QMainWindow):
 
             if category:
                 print("Updating businesses with category filter")
-                query = "SELECT DISTINCT b.name, b.address, b.city, b.stars, b.review_count AS Reviews, b.review_rating AS Rating, b.num_checkins AS Checkins FROM business b LEFT JOIN categories c on b.business_id = c.business_id WHERE b.state=%s"
+                query = "SELECT DISTINCT b.name, b.address, b.city, b.stars, b.review_count AS Reviews, ROUND(b.review_rating::numeric, 2) AS Rating, b.num_checkins AS Checkins FROM business b LEFT JOIN categories c on b.business_id = c.business_id WHERE b.state=%s"
                 params = [state]
                 if city:
                     query += " AND city=%s"
@@ -265,7 +268,7 @@ class MainWindow(QMainWindow):
                 query += "ORDER BY b.name;"
             else:
                 print("Updating businesses without category filter")
-                query = 'SELECT DISTINCT name, address, city, stars, review_count AS "Reviews", review_rating AS "Rating", num_checkins AS "Checkins" FROM business WHERE state=%s'
+                query = 'SELECT DISTINCT name, address, city, stars, review_count AS "Reviews", ROUND(review_rating::numeric, 2) AS "Rating", num_checkins AS "Checkins" FROM business WHERE state=%s'
                 params = [state]
                 if city:
                     query += " AND city=%s"
@@ -281,7 +284,7 @@ class MainWindow(QMainWindow):
             self._businessSelection.clear()
             self._businessSelection.setRowCount(len(results))
             self._businessSelection.setColumnCount(7)
-            headers = ["Name", "Address", "City", "Stars", "Review Count", "Review Rating", "Num Checkins"]
+            headers = ["Name", "Address", "City", "Stars", "Reviews", "Rating", "Checkins"]
             self._businessSelection.setHorizontalHeaderLabels(headers)
             for row, tup in enumerate(results):
                 for col, value in enumerate(tup):
@@ -368,7 +371,7 @@ class MainWindow(QMainWindow):
             # in the selected zipcode and category (if selected)
 
             if category:
-                query = 'SELECT b.name, b.address, b.review_rating as Rating, b.stars FROM Business b JOIN (SELECT city, AVG(num_checkins) AS avg_checkins FROM Business GROUP BY city) AS city_avg ON b.city = city_avg.city LEFT JOIN categories c ON b.business_id = c.business_id WHERE b.num_checkins > city_avg.avg_checkins AND b.state=%s'
+                query = 'SELECT b.name, b.address, ROUND(b.review_rating::numeric, 2) as Rating, b.stars FROM Business b JOIN (SELECT city, AVG(num_checkins) AS avg_checkins FROM Business GROUP BY city) AS city_avg ON b.city = city_avg.city LEFT JOIN categories c ON b.business_id = c.business_id WHERE b.num_checkins > city_avg.avg_checkins AND b.state=%s'
                 params = [state]
                 if city:
                     query += " AND b.city=%s"
@@ -381,7 +384,7 @@ class MainWindow(QMainWindow):
                     params.append(category)
                 query += " GROUP BY b.business_id, b.city, b.name ORDER BY b.city, b.num_checkins DESC;"
             else:
-                query = 'SELECT b.name, b.address, b.review_rating as Rating, b.stars FROM Business b JOIN (  SELECT city, AVG(num_checkins) AS avg_checkins FROM Business GROUP BY city) AS city_avg ON b.city = city_avg.city WHERE b.num_checkins > city_avg.avg_checkins AND b.state=%s'
+                query = 'SELECT b.name, b.address, ROUND(b.review_rating::numeric, 2) as Rating, b.stars FROM Business b JOIN (  SELECT city, AVG(num_checkins) AS avg_checkins FROM Business GROUP BY city) AS city_avg ON b.city = city_avg.city WHERE b.num_checkins > city_avg.avg_checkins AND b.state=%s'
                 params = [state]
                 if city:
                     query += " AND b.city=%s"
@@ -405,12 +408,99 @@ class MainWindow(QMainWindow):
                     item = QTableWidgetItem(str(value)) # Convert values to strings
                     self._popularBusinesses.setItem(row, col, item)
 
-        except:
-            print("Error updating popular businesses")
+        except  Exception as e:
+            print("Error updating popular businesses: ", e)
             traceback.print_exc()
 
     def updateSuccessfulBusinesses(self):
-        print("Updating successful businesses")
+        try:
+            print("Updating successful businesses")
+            state = self._stateSelection.currentText()
+            cityItem = self._citySelection.currentItem()
+            zipItem = self._zipcodeSelection.currentItem()
+            categoryItem = self._filterCategorySelection.currentItem()
+            city = cityItem.text() if cityItem else ''
+            zipCode = zipItem.text() if zipItem else ''
+            category = categoryItem.text() if categoryItem else ''
+
+            """
+            So we have an example of the query that we will be using to get the successful businesses
+            WITH EarliestReview AS (
+                SELECT business_id, MIN(date) AS earliest_review_date
+                FROM Review
+                GROUP BY business_id
+            ),
+            RepeatCustomers AS (
+                SELECT b.business_id, b.name, b.address, b.city, b.state, 
+                        b.review_rating, b.stars,
+                    COUNT(r.customer_id) AS repeat_customers
+                FROM Business b
+                JOIN Review r ON b.business_id = r.business_id
+                JOIN categories c ON b.business_id = c.business_id
+                WHERE b.is_open = TRUE
+                AND b.review_rating >= 3.0
+                AND b.state = 'NV'
+                AND b.city = 'Las Vegas'
+                AND b.postal_code = '89102'
+                AND c.category = 'Restaurants'
+                GROUP BY b.business_id, b.name, b.address, b.city, b.state
+                HAVING COUNT(r.customer_id) > 2
+            )
+            SELECT rc.business_id, rc.name, rc.address, ROUND(rc.review_rating::numeric, 2) as Rating, 
+                rc.stars AS Stars
+            FROM RepeatCustomers rc
+            JOIN EarliestReview er ON rc.business_id = er.business_id
+            WHERE er.earliest_review_date <= CURRENT_DATE - INTERVAL '7 years'
+            ORDER BY rc.repeat_customers DESC;
+
+            We're gonna have to make a few changes to the query to make it more dynamic.
+            In RepeatCustomers, we'll have to change the WHERE clause to include the parameters that we have.
+            """
+            query='''WITH EarliestReview AS (SELECT business_id, MIN(date) AS earliest_review_date FROM Review GROUP BY business_id),
+            RepeatCustomers AS (
+                SELECT b.business_id, b.name, b.address, b.city, b.state, b.review_rating, b.stars, COUNT(r.customer_id) AS repeat_customers
+                FROM Business b
+                JOIN Review r ON b.business_id = r.business_id
+                JOIN categories c ON b.business_id = c.business_id
+                WHERE b.is_open = TRUE
+                AND b.review_rating >= 3.0
+                AND b.state = %s
+                '''
+            params = [state]
+            if city:
+                query += " AND b.city=%s"
+                params.append(city)
+            if zipCode:
+                query += " AND b.postal_code=%s"
+                params.append(zipCode)
+            if category:
+                query += " AND c.category=%s"
+                params.append(category)
+            query += '''GROUP BY b.business_id, b.name, b.address, b.city, b.state
+            HAVING COUNT(r.customer_id) > 2)
+            SELECT rc.name, rc.address, ROUND(rc.review_rating::numeric, 2) as Rating, rc.stars AS Stars
+            FROM RepeatCustomers rc
+            JOIN EarliestReview er ON rc.business_id = er.business_id
+            WHERE er.earliest_review_date <= CURRENT_DATE - INTERVAL '7 years'
+            ORDER BY rc.repeat_customers DESC;
+            '''
+            
+            self._cursor.execute(query, tuple(params))
+            results = self._cursor.fetchall()
+
+            self._successfulBusinesses.clear()
+            self._successfulBusinesses.setRowCount(len(results))
+            self._successfulBusinesses.setColumnCount(4)
+            headers = ["Name", "Address", "Rating", "Stars"]
+            self._successfulBusinesses.setHorizontalHeaderLabels(headers)
+            for row, tup in enumerate(results):
+                for col, value in enumerate(tup):
+                    item = QTableWidgetItem(str(value)) # Convert values to strings
+                    self._successfulBusinesses.setItem(row, col, item)
+        except Exception as e:
+            print("Error updating successful businesses: ", e)
+            traceback.print_exc()
+    
 
     def closeEvent(self, event):
         self._cursor.close()
