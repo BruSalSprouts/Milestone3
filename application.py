@@ -21,6 +21,7 @@ class MainWindow(QMainWindow):
         self._citySelection = QListWidget() # List of cities in the selected state, also selects a city
         self._zipcodeSelection = QListWidget() # List of zipcodes in the selected city, also selects a zipcode
         self._businessSelection = QTableWidget() # Table of businesses in the selected zipcode
+        self._filterCategorySelection = QListWidget() # List of categories to filter businesses by from selected zipcode, also can help select a business
         self._zipcodeNumBusinesses = QLineEdit() # Number of businesses in the selected zipcode
         self._zipcodePopulation = QLineEdit() # Total population of the selected zipcode
         self._zipcodeAverageIncome = QLineEdit() # Average income of the selected zipcode
@@ -61,23 +62,24 @@ class MainWindow(QMainWindow):
         group_box = QGroupBox("Select Location")
         layout = QVBoxLayout()
 
-        dropdown_label = QLabel("State:")
+        _stateLabel = QLabel("State:")
         # self._stateSelection = QComboBox()
         self._cursor.execute("SELECT DISTINCT state FROM business ORDER BY state;")
         results = self._cursor.fetchall()
         self._stateSelection.addItems([state[0] for state in results])
         self._stateSelection.currentIndexChanged.connect(self.updateCities)
 
-        list1_label = QLabel("City:")
+        _cityLabel = QLabel("City:")
         # self._citySelection = QListWidget()
 
-        list2_label = QLabel("Zipcode:")
+        _zipcodeLabel = QLabel("Zipcode:")
         # self._zipcodeSelection = QListWidget()
 
         # Updating the cities and zipcodes
         self._citySelection.itemSelectionChanged.connect(self.updateZipcodes)
         self._zipcodeSelection.itemSelectionChanged.connect(self.updateBusinesses)
         self._zipcodeSelection.itemSelectionChanged.connect(self.updateZipcodeStats)
+        self._zipcodeSelection.itemSelectionChanged.connect(self.updateCategoryBusinesses)
 
         self._stateSelection.setFixedSize(50, 25)
         self._citySelection.setFixedSize(180, 140)
@@ -87,11 +89,11 @@ class MainWindow(QMainWindow):
         
 
         horizontal_layout = QHBoxLayout()
-        horizontal_layout.addWidget(dropdown_label)
+        horizontal_layout.addWidget(_stateLabel)
         horizontal_layout.addWidget(self._stateSelection)
-        horizontal_layout.addWidget(list1_label)
+        horizontal_layout.addWidget(_cityLabel)
         horizontal_layout.addWidget(self._citySelection)
-        horizontal_layout.addWidget(list2_label)
+        horizontal_layout.addWidget(_zipcodeLabel)
         horizontal_layout.addWidget(self._zipcodeSelection)
 
         layout.addLayout(horizontal_layout)
@@ -103,16 +105,16 @@ class MainWindow(QMainWindow):
         group_box = QGroupBox("Zipcode Statistics")
         layout = QVBoxLayout()
 
-        text1_label = QLabel("# of Businesses")
+        _businessCountLabel = QLabel("# of Businesses")
         # self._zipcodeNumBusinesses = QLineEdit()
 
-        text2_label = QLabel("Total Population")
+        _totalPopulationLabel = QLabel("Total Population")
         # self._zipcodePopulation = QLineEdit()
 
-        text3_label = QLabel("Average Income:")
+        _averageIncomeLabel = QLabel("Average Income:")
         # self._zipcodeAverageIncome = QLineEdit()
 
-        list_label = QLabel("Top Categories:")
+        _topCategoriesLabel = QLabel("Top Categories:")
         # self._topZipcodeCategories = QListWidget()
         
         self._zipcodeNumBusinesses.setFixedSize(150, 25)
@@ -120,13 +122,13 @@ class MainWindow(QMainWindow):
         self._zipcodeAverageIncome.setFixedSize(150, 25)
         self._topZipcodeCategories.setFixedSize(470, 140)
 
-        layout.addWidget(text1_label)
+        layout.addWidget(_businessCountLabel)
         layout.addWidget(self._zipcodeNumBusinesses)
-        layout.addWidget(text2_label)
+        layout.addWidget(_totalPopulationLabel)
         layout.addWidget(self._zipcodePopulation)
-        layout.addWidget(text3_label)
+        layout.addWidget(_averageIncomeLabel)
         layout.addWidget(self._zipcodeAverageIncome)
-        layout.addWidget(list_label)
+        layout.addWidget(_topCategoriesLabel)
         layout.addWidget(self._topZipcodeCategories)
         group_box.setLayout(layout)
 
@@ -136,28 +138,32 @@ class MainWindow(QMainWindow):
         group_box = QGroupBox("Businesses")
         layout = QHBoxLayout()
 
-        list1_label = QLabel("Select Category for Filtering")
-        list1 = QListWidget()
+        list1_label = QLabel("Select Category")
+        # self._filterCategory = QListWidget()
+        self._filterCategorySelection.itemSelectionChanged.connect(self.updateBusinesses)
 
-        button1 = QPushButton("Button 1")
-        button2 = QPushButton("Button 2")
+        _categoryBusinessRefreshButton = QPushButton("Refresh")
+        _categoryResetButton = QPushButton("Reset")
+        _categoryResetButton.clicked.connect(self._businessSelection.clear)
+        _categoryResetButton.clicked.connect(self._filterCategorySelection.clear)
+        _categoryResetButton.clicked.connect(self.updateBusinesses)
 
         list2_label = QLabel("Businesses")
         # self._businessSelection = QTableWidget()
         self._businessSelection.horizontalHeader().setStretchLastSection(True) 
         self._businessSelection.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
-        list1.setFixedSize(200, 140)
-        self._businessSelection.setFixedSize(540, 140)
-        button1.setFixedSize(40, 50)
-        button2.setFixedSize(40, 50)
+        self._filterCategorySelection.setFixedSize(200, 140)
+        self._businessSelection.setFixedSize(600, 140)
+        _categoryBusinessRefreshButton.setFixedSize(50, 50)
+        _categoryResetButton.setFixedSize(50, 50)
 
         vertical_layout = QVBoxLayout()
-        vertical_layout.addWidget(button1)
-        vertical_layout.addWidget(button2)
+        vertical_layout.addWidget(_categoryBusinessRefreshButton)
+        vertical_layout.addWidget(_categoryResetButton)
 
         layout.addWidget(list1_label)
-        layout.addWidget(list1)
+        layout.addWidget(self._filterCategorySelection)
         layout.addLayout(vertical_layout)
         layout.addWidget(list2_label)
         layout.addWidget(self._businessSelection)
@@ -196,6 +202,8 @@ class MainWindow(QMainWindow):
             self._citySelection.clear()
             self._citySelection.addItems([city[0] for city in results])
 
+            self._filterCategorySelection.clear()
+            self._businessSelection.clear()
             # self._updateBusinesses()
         except Exception as e:
             print("Error updating cities: ", e)
@@ -232,16 +240,34 @@ class MainWindow(QMainWindow):
             zipItem = self._zipcodeSelection.currentItem()
             city = cityItem.text() if cityItem else ''
             zipCode = zipItem.text() if zipItem else ''
+            categoryItem = self._filterCategorySelection.currentItem()
+            category = categoryItem.text() if categoryItem else ''
 
-            query = "SELECT DISTINCT name, address, city, stars, review_count, review_rating, num_checkins FROM business WHERE state=%s"
-            params = [state]
-            if city:
-                query += " AND city=%s"
-                params.append(city)
-            if zipCode:
-                query += " AND postal_code=%s"
-                params.append(zipCode)
-            query += " ORDER BY name;"
+            if category:
+                print("Updating businesses with category filter")
+                query = "SELECT DISTINCT b.name, b.address, b.city, b.stars, b.review_count AS Reviews, b.review_rating AS Rating, b.num_checkins AS Checkins FROM business b LEFT JOIN categories c on b.business_id = c.business_id WHERE b.state=%s"
+                params = [state]
+                if city:
+                    query += " AND city=%s"
+                    params.append(city)
+                if zipCode:
+                    query += " AND postal_code=%s"
+                    params.append(zipCode)
+                if category:
+                    query += " AND c.category=%s"
+                    params.append(category)
+                query += "ORDER BY b.name;"
+            else:
+                print("Updating businesses without category filter")
+                query = 'SELECT DISTINCT name, address, city, stars, review_count AS "Reviews", review_rating AS "Rating", num_checkins AS "Checkins" FROM business WHERE state=%s'
+                params = [state]
+                if city:
+                    query += " AND city=%s"
+                    params.append(city)
+                if zipCode:
+                    query += " AND postal_code=%s"
+                    params.append(zipCode)
+                query += " ORDER BY name;"
 
             self._cursor.execute(query, tuple(params))
             results = self._cursor.fetchall()
@@ -288,6 +314,39 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print("Error updating zipcode stats: ", e)
             traceback.print_exc
+
+    def updateCategoryBusinesses(self):
+        try:
+            print("Updating category for filtering businesses")
+            state = self._stateSelection.currentText()
+            cityItem = self._citySelection.currentItem()
+            zipItem = self._zipcodeSelection.currentItem()
+            city = cityItem.text() if cityItem else ''
+            zipCode = zipItem.text() if zipItem else ''
+
+            query = "SELECT DISTINCT c.category FROM categories c LEFT JOIN business b on c.business_id = b.business_id WHERE b.state=%s"
+            params = [state]
+            if city:
+                query += " AND city=%s"
+                params.append(city)
+            if zipCode:
+                query += " AND postal_code=%s"
+                params.append(zipCode)
+                query += " ORDER BY c.category;"
+
+            self._cursor.execute(query, tuple(params))
+            results = self._cursor.fetchall()
+
+            self._filterCategorySelection.clear()
+            self._filterCategorySelection.addItems([category[0] for category in results])
+
+        except Exception as e:
+            print("Error updating category businesses: ", e)
+            traceback.print_exc()
+
+    def resetCategoryBusinesses(self):
+        self._filterCategorySelection.clear()
+        self._updateBusinesses()
 
     def closeEvent(self, event):
         self._cursor.close()
