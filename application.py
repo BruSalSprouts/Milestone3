@@ -79,6 +79,7 @@ class MainWindow(QMainWindow):
         # Updating the cities and zipcodes
         self._citySelection.itemSelectionChanged.connect(self.updateZipcodes)
         self._zipcodeSelection.itemSelectionChanged.connect(self.updateBusinesses)
+        self._zipcodeSelection.itemSelectionChanged.connect(self.businessTableSizeAdjust)
         self._zipcodeSelection.itemSelectionChanged.connect(self.updateZipcodeStats)
         self._zipcodeSelection.itemSelectionChanged.connect(self.updateCategoryBusinesses)
         self._zipcodeSelection.itemSelectionChanged.connect(self.updatePopularBusinesses)
@@ -151,6 +152,7 @@ class MainWindow(QMainWindow):
         _categoryBusinessRefreshButton = QPushButton("Refresh")
         _categoryBusinessRefreshButton.clicked.connect(self._businessSelection.clear)
         _categoryBusinessRefreshButton.clicked.connect(self.updateBusinesses)
+        _categoryBusinessRefreshButton.clicked.connect(self.businessTableSizeAdjust)
         _categoryBusinessRefreshButton.clicked.connect(self._popularBusinesses.clear)
         _categoryBusinessRefreshButton.clicked.connect(self.updatePopularBusinesses)
         _categoryBusinessRefreshButton.clicked.connect(self._successfulBusinesses.clear)
@@ -160,6 +162,7 @@ class MainWindow(QMainWindow):
         _categoryResetButton.clicked.connect(self._filterCategorySelection.clear)
         _categoryResetButton.clicked.connect(self.updateCategoryBusinesses)
         _categoryResetButton.clicked.connect(self.updateBusinesses)
+        _categoryResetButton.clicked.connect(self.businessTableSizeAdjust)
         _categoryResetButton.clicked.connect(self._popularBusinesses.clear)
         _categoryResetButton.clicked.connect(self.updatePopularBusinesses)
         _categoryResetButton.clicked.connect(self._successfulBusinesses.clear)
@@ -169,6 +172,8 @@ class MainWindow(QMainWindow):
         # self._businessSelection = QTableWidget()
         self._businessSelection.horizontalHeader().setStretchLastSection(True) 
         self._businessSelection.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self._businessSelection.setSizeAdjustPolicy(QTableWidget.SizeAdjustPolicy.AdjustToContents)
+        self._businessSelection.resizeColumnsToContents()
 
         self._filterCategorySelection.setFixedSize(170, 140)
         self._businessSelection.setFixedSize(650, 140)
@@ -186,6 +191,12 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._businessSelection)
         group_box.setLayout(layout)
         return group_box
+
+    def businessTableSizeAdjust(self):
+        self._businessSelection.horizontalHeader().setStretchLastSection(True) 
+        self._businessSelection.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self._businessSelection.setSizeAdjustPolicy(QTableWidget.SizeAdjustPolicy.AdjustToContents)
+        self._businessSelection.resizeColumnsToContents
 
     def create_bottom_pane(self):
         group_box = QGroupBox("What's Good?")
@@ -465,7 +476,7 @@ class MainWindow(QMainWindow):
             """
             query='''WITH EarliestReview AS (SELECT business_id, MIN(date) AS earliest_review_date FROM Review GROUP BY business_id),
             RepeatCustomers AS (
-                SELECT b.business_id, b.name, b.address, b.city, b.state, b.review_rating, b.stars, COUNT(r.customer_id) AS repeat_customers
+                SELECT b.business_id, b.name, b.address, b.city, b.state, b.review_rating, b.stars, b.num_checkins, COUNT(r.customer_id) AS repeat_customers
                 FROM Business b
                 JOIN Review r ON b.business_id = r.business_id
                 JOIN categories c ON b.business_id = c.business_id
@@ -485,7 +496,7 @@ class MainWindow(QMainWindow):
                 params.append(category)
             query += '''GROUP BY b.business_id, b.name, b.address, b.city, b.state
             HAVING COUNT(r.customer_id) > 2)
-            SELECT rc.name, rc.address, rc.city, ROUND(rc.review_rating::numeric, 2) as Rating
+            SELECT rc.name, rc.address, rc.city, ROUND(rc.review_rating::numeric, 2) as Rating, rc.num_checkins
             FROM RepeatCustomers rc
             JOIN EarliestReview er ON rc.business_id = er.business_id
             WHERE er.earliest_review_date <= CURRENT_DATE - INTERVAL '7 years'
@@ -497,8 +508,8 @@ class MainWindow(QMainWindow):
 
             self._successfulBusinesses.clear()
             self._successfulBusinesses.setRowCount(len(results))
-            self._successfulBusinesses.setColumnCount(4)
-            headers = ["Name", "Address", "City", "Review\nRating"]
+            self._successfulBusinesses.setColumnCount(5)
+            headers = ["Name", "Address", "City", "Review\nRating", "Number\nof Checkins"]
             self._successfulBusinesses.setHorizontalHeaderLabels(headers)
             for row, tup in enumerate(results):
                 for col, value in enumerate(tup):
