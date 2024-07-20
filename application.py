@@ -291,7 +291,7 @@ class MainWindow(QMainWindow):
             self._businessSelection.clear()
             self._businessSelection.setRowCount(len(results))
             self._businessSelection.setColumnCount(7)
-            headers = ["Name", "Address", "City", "Stars", "Reviews", "Rating", "Checkins"]
+            headers = ["Business\nName", "Address", "City", "Stars", "Review\nCount", "Review\nRating", "Number\nof Checkins"]
             self._businessSelection.setHorizontalHeaderLabels(headers)
             for row, tup in enumerate(results):
                 for col, value in enumerate(tup):
@@ -378,7 +378,7 @@ class MainWindow(QMainWindow):
             # in the selected zipcode and category (if selected)
 
             if category:
-                query = 'SELECT b.name, b.address, ROUND(b.review_rating::numeric, 2) as Rating, b.stars FROM Business b JOIN (SELECT city, AVG(num_checkins) AS avg_checkins FROM Business GROUP BY city) AS city_avg ON b.city = city_avg.city LEFT JOIN categories c ON b.business_id = c.business_id WHERE b.num_checkins > city_avg.avg_checkins AND b.state=%s'
+                query = 'SELECT b.name, b.address, b.city, ROUND(b.review_rating::numeric, 2) as Rating FROM Business b JOIN (SELECT city, AVG(num_checkins) AS avg_checkins FROM Business GROUP BY city) AS city_avg ON b.city = city_avg.city LEFT JOIN categories c ON b.business_id = c.business_id WHERE b.num_checkins > city_avg.avg_checkins AND b.state=%s'
                 params = [state]
                 if city:
                     query += " AND b.city=%s"
@@ -391,7 +391,7 @@ class MainWindow(QMainWindow):
                     params.append(category)
                 query += " GROUP BY b.business_id, b.city, b.name ORDER BY b.city, b.num_checkins DESC;"
             else:
-                query = 'SELECT b.name, b.address, ROUND(b.review_rating::numeric, 2) as Rating, b.stars FROM Business b JOIN (  SELECT city, AVG(num_checkins) AS avg_checkins FROM Business GROUP BY city) AS city_avg ON b.city = city_avg.city WHERE b.num_checkins > city_avg.avg_checkins AND b.state=%s'
+                query = 'SELECT b.name, b.address, b.city, ROUND(b.review_rating::numeric, 2) as Rating FROM Business b JOIN (  SELECT city, AVG(num_checkins) AS avg_checkins FROM Business GROUP BY city) AS city_avg ON b.city = city_avg.city WHERE b.num_checkins > city_avg.avg_checkins AND b.state=%s'
                 params = [state]
                 if city:
                     query += " AND b.city=%s"
@@ -408,7 +408,7 @@ class MainWindow(QMainWindow):
             # self._popularBusinesses.addItems([business[1] for business in results])
             self._popularBusinesses.setRowCount(len(results))
             self._popularBusinesses.setColumnCount(4)
-            headers = ["Name", "Address", "Rating", "Stars"]
+            headers = ["Name", "Address", "City", "Review\nRating"]
             self._popularBusinesses.setHorizontalHeaderLabels(headers)
             for row, tup in enumerate(results):
                 for col, value in enumerate(tup):
@@ -485,7 +485,7 @@ class MainWindow(QMainWindow):
                 params.append(category)
             query += '''GROUP BY b.business_id, b.name, b.address, b.city, b.state
             HAVING COUNT(r.customer_id) > 2)
-            SELECT rc.name, rc.address, ROUND(rc.review_rating::numeric, 2) as Rating, rc.stars AS Stars
+            SELECT rc.name, rc.address, rc.city, ROUND(rc.review_rating::numeric, 2) as Rating
             FROM RepeatCustomers rc
             JOIN EarliestReview er ON rc.business_id = er.business_id
             WHERE er.earliest_review_date <= CURRENT_DATE - INTERVAL '7 years'
@@ -498,7 +498,7 @@ class MainWindow(QMainWindow):
             self._successfulBusinesses.clear()
             self._successfulBusinesses.setRowCount(len(results))
             self._successfulBusinesses.setColumnCount(4)
-            headers = ["Name", "Address", "Rating", "Stars"]
+            headers = ["Name", "Address", "City", "Review\nRating"]
             self._successfulBusinesses.setHorizontalHeaderLabels(headers)
             for row, tup in enumerate(results):
                 for col, value in enumerate(tup):
