@@ -147,10 +147,18 @@ class MainWindow(QMainWindow):
         self._filterCategorySelection.itemSelectionChanged.connect(self.updatePopularBusinesses)
         self._filterCategorySelection.itemSelectionChanged.connect(self.updateSuccessfulBusinesses)
 
+        _categorySearchButton = QPushButton("Search")
         _categoryBusinessRefreshButton = QPushButton("Refresh")
+        _categoryBusinessRefreshButton.clicked.connect(self._businessSelection.clear)
+        _categoryBusinessRefreshButton.clicked.connect(self.updateBusinesses)
+        _categoryBusinessRefreshButton.clicked.connect(self._popularBusinesses.clear)
+        _categoryBusinessRefreshButton.clicked.connect(self.updatePopularBusinesses)
+        _categoryBusinessRefreshButton.clicked.connect(self._successfulBusinesses.clear)
+        _categoryBusinessRefreshButton.clicked.connect(self.updateSuccessfulBusinesses)
         _categoryResetButton = QPushButton("Clear\nFilter")
         _categoryResetButton.clicked.connect(self._businessSelection.clear)
         _categoryResetButton.clicked.connect(self._filterCategorySelection.clear)
+        _categoryResetButton.clicked.connect(self.updateCategoryBusinesses)
         _categoryResetButton.clicked.connect(self.updateBusinesses)
         _categoryResetButton.clicked.connect(self._popularBusinesses.clear)
         _categoryResetButton.clicked.connect(self.updatePopularBusinesses)
@@ -183,18 +191,18 @@ class MainWindow(QMainWindow):
         group_box = QGroupBox("What's Good?")
         layout = QHBoxLayout()
 
-        button = QPushButton("Button")
+        # button = QPushButton("Button")
         popularBizLabel = QLabel("Popular Businesses")
         # self._popularBusinesses = QListWidget()
 
         successfulBizLabel = QLabel("Succesful Businesses")
         # self._successfulBusinesses = QListWidget()
 
-        self._popularBusinesses.setFixedSize(380, 140)
-        self._successfulBusinesses.setFixedSize(380, 140)
-        button.setFixedSize(40, 40)
+        self._popularBusinesses.setFixedSize(420, 140)
+        self._successfulBusinesses.setFixedSize(420, 140)
+        # button.setFixedSize(40, 40)
 
-        layout.addWidget(button)
+        # layout.addWidget(button)
         layout.addWidget(popularBizLabel)
         layout.addWidget(self._popularBusinesses)
         layout.addWidget(successfulBizLabel)
@@ -237,7 +245,6 @@ class MainWindow(QMainWindow):
 
             self._zipcodeSelection.clear()
             self._zipcodeSelection.addItems([zipcode[0] for zipcode in results])
-
         except Exception as e:
             print("Error updating zip codes: ", e)
             traceback.print_exc()
